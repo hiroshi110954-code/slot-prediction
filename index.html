@@ -438,8 +438,8 @@
     <div class="logic-guide-content">
       <strong>【解析値照合＆設定推測仕様】</strong>
       <ul>
-        <li><strong>ノーマル機（ジャグラー・ハナハナ等）:</strong> 合算およびREG確率を解析テーブルと照合（設定1〜6）。</li>
-        <li><strong>スマスロ・AT機（北斗・カバネリ・AT系）:</strong> 単純な合算ではなく、連チャンを除いた<strong>「実質初当り合算確率」</strong>を自動抽出し、初当りスペックテーブル（1/218〜1/345）と照合。</li>
+        <li><strong>ノーマル機（ジャグラー・ハナハナ等）:</strong> 合算およびREG確率を解析テーブルと照合（設定1〜6）[cite: 1]。</li>
+        <li><strong>スマスロ・AT機（北斗・カバネリ・AT系）:</strong> 単純な合算ではなく、連チャンを除いた<strong>「実質初当り合算確率」</strong>を自動抽出し、初当りスペックテーブル（1/218〜1/345）と照合[cite: 1]。</li>
         <li><strong>スマスロ不発高設定:</strong> 3,500G以上 ＋ 差枚マイナス ＋ 初当り設定⑤⑥近似で[+20%]（展開負けによる翌日据置・リベンジ狙い）[cite: 1]。</li>
         <li><strong>差枚トレンド:</strong> 直近凹み[+15%]、2日連続凹み[+10%]、3日連続凹み[+20%]、直近+1,800枚[+12%]、連日大勝[-15%][cite: 1]。</li>
         <li><strong>長期未投入サイクル:</strong> 過去に高設定挙動がない期間が継続している台に[+8%]（投入サイクル狙い）[cite: 1]。</li>
@@ -456,13 +456,12 @@
 
   <!-- シマ並びヒートマップ表示エリア -->
   <div id="mapViewContainer" style="display:none;">
-    <!-- シマ配置マスタの編集パネル（Web画面から直接編集可能） -->
     <details class="logic-guide-box" style="margin-bottom:12px;">
       <summary class="logic-guide-summary" style="color:#0f766e; background:#ccfbf1;">⚙️ シマ配置（島列・通路）をテキスト貼り付けで編集</summary>
       <div class="logic-guide-content" style="background:#f0fdfa;">
         <p style="margin:0 0 8px 0; font-size:0.8rem; color:#475569;">
-          スプレッドシートを開かずに、台番号を貼り付けるだけで「layout」シートを即時更新できます。<br>
-          台番号は<strong>改行</strong>または<strong>スペース・カンマ区切り</strong>で入力してください。
+          スプレッドシートを開かずに、台番号を貼り付けるだけで「layout」シートを即時更新できます[cite: 1]。<br>
+          台番号は<strong>改行</strong>または<strong>スペース・カンマ区切り</strong>で入力してください[cite: 1]。
         </p>
         <button type="button" class="exec-btn" style="background-color:#0d9488; padding:6px; font-size:0.8rem; width:auto; margin-bottom:10px;" onclick="loadCurrentLayoutToForm()">現在の配置をフォームに読み込む</button>
         <div class="form-row">
