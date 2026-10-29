@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スロット翌日設定予測</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 16px;
+      color: #333;
+    }
+    .wrapper { max-width: 600px; margin: 0 auto; }
+    .config-card {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .config-card h2 {
+      margin: 0 0 12px 0;
+      font-size: 1.05rem;
+      color: #1a73e8;
+    }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #555;
+    }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    select, input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="file"], textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background-color: white;
+      font-family: inherit;
+    }
+    textarea {
+      resize: vertical;
+      line-height: 1.4;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      margin-top: 6px;
+      cursor: pointer;
+    }
+    .exec-btn {
+      width: 100%;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .exec-btn:hover { background-color: #1557b0; }
+    .exec-btn:disabled { background-color: #aaa; cursor: not-allowed; }
+
+    /* プログレスバー */
+    .progress-wrap {
+      margin-top: 10px;
+      display: none;
+      background: #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 12px;
+    }
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: #2e7d32;
+      transition: width 0.3s ease;
+    }
+
+    /* ビュー切替タブ */
+    .tab-group {
+      display: flex;
+      margin-bottom: 14px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #1a73e8;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      background: white;
+      color: #1a73e8;
+      font-weight: bold;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+    }
+    .tab-btn.active {
+      background: #1a73e8;
+      color: white;
+    }
+
+    /* シマ並びマップレイアウト */
+    .island-layout-wrap {
+      overflow-x: auto;
+      background: white;
+      padding: 14px;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      margin-bottom: 16px;
+    }
+    .island-grid {
+      display: grid;
+      gap: 8px;
+      min-width: 100%;
+      justify-content: center;
+    }
+    .heatmap-cell {
+      padding: 8px 4px;
+      border-radius: 6px;
+      text-align: center;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      transition: transform 0.1s;
+      min-width: 64px;
+    }
+    .heatmap-cell:hover { transform: scale(1.05); }
+    .heatmap-cell .hm-no { font-size: 0.85rem; font-weight: bold; }
+    .heatmap-cell .hm-score { font-size: 0.72rem; }
+
+    .hm-aisle {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 6px;
+      min-height: 48px;
+      min-width: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .hm-label {
+      background: #e2e8f0;
+      color: #334155;
+      font-weight: bold;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      text-align: center;
+    }
+
+    .hm-lv-6 { background-color: #b71c1c; } /* 90%以上 */
+    .hm-lv-5 { background-color: #d32f2f; } /* 80-89% */
+    .hm-lv-4 { background-color: #f57c00; } /* 70-79% */
+    .hm-lv-3 { background-color: #fbc02d; color: #333; } /* 55-69% */
+    .hm-lv-low { background-color: #78909c; } /* 55%未満 */
+
+    /* ガイド & 編集アコーディオン */
+    .logic-guide-box {
+      background: #eef2f6;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .logic-guide-summary {
+      padding: 10px 14px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      color: #1e3a8a;
+      cursor: pointer;
+      background: #e2e8f0;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logic-guide-summary::-webkit-details-marker { display: none; }
+    .logic-guide-summary::after {
+      content: "▼";
+      font-size: 0.75rem;
+      transition: transform 0.2s;
+    }
+    details[open] .logic-guide-summary::after {
+      transform: rotate(180deg);
+    }
+    .logic-guide-content {
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #334155;
+    }
+    .logic-guide-content ul {
+      margin: 4px 0 8px 18px;
+      padding: 0;
+    }
+
+    /* 結果カード */
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border-left: 6px solid #ccc;
+    }
+    .card.sueoki { border-left-color: #1a73e8; }
+    .card.age { border-left-color: #e65100; }
+    .card.fuhatsu { border-left-color: #8e24aa; }
+    .card.tokubetsu { border-left-color: #2e7d32; }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+    .machine-no-area {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .machine-no { font-size: 1.15rem; font-weight: bold; color: #111; }
+    .date-badge {
+      font-size: 0.72rem;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .type-badge {
+      font-size: 0.72rem;
+      background: #ede7f6;
+      color: #512da8;
+      border: 1px solid #d1c4e9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .score-badge { font-size: 0.95rem; font-weight: bold; text-align: right; }
+    .score-badge.high { color: #d32f2f; }
+    .score-badge.mid { color: #f57c00; }
+    .score-badge.low { color: #616161; }
+
+    .setting-predict-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+    .pill-badge {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .pill-past {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .pill-target {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+
+    .machine-name { font-size: 0.9rem; color: #555; margin-bottom: 8px; font-weight: 500; }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      font-size: 0.85rem;
+      background: #fafafa;
+      padding: 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    .data-grid div span { display: block; color: #64748b; font-size: 0.72rem; }
+    .data-grid div strong { font-size: 0.88rem; color: #1e293b; }
+
+    .reason-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .reason-title {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #1e40af;
+      margin-bottom: 5px;
+    }
+    .reason-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .reason-badge {
+      font-size: 0.75rem;
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      padding: 3px 7px;
+      border-radius: 4px;
+    }
+    .reason-badge.highlight {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #fde68a;
+      font-weight: 600;
+    }
+
+    .status-msg { text-align: center; padding: 24px 0; color: #777; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <!-- API接続設定 -->
+  <div class="config-card">
+    <h2>API接続設定</h2>
+    <div class="form-group">
+      <label for="apiUrl">GAS Web App URL (外部ホスティング時のみ入力)</label>
+      <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="form-group">
+      <label for="apiToken">APIトークン (任意)</label>
+      <input type="password" id="apiToken" placeholder="スクリプトプロパティ「API_TOKEN」を設定時のみ">
+    </div>
+    <button class="exec-btn" style="background-color: #546e7a; padding: 8px; font-size: 0.9rem;" onclick="saveApiConfig()">設定を端末に保存</button>
+  </div>
+
+  <!-- 画像アップロード部 -->
+  <div class="config-card">
+    <h2>P'sCUBE 画像読み取り（複数スクショ一括対応）</h2>
+    <div class="form-group">
+      <label for="baseDate">画像内の「本日」の日付</label>
+      <input type="date" id="baseDate">
+    </div>
+
+    <div class="form-group">
+      <label for="slotImages">スクショ画像を選択（複数選択可）</label>
+      <input type="file" id="slotImages" accept="image/*" multiple>
+    </div>
+
+    <button class="exec-btn" id="uploadBtn" style="background-color: #2e7d32;" onclick="uploadAndParseImages()">選択した画像を連続登録</button>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div id="uploadStatus" style="font-size:0.85rem; margin-top:8px; color:#555;"></div>
+  </div>
+
+  <!-- 特定日告知バナー -->
+  <div id="specialDayBanner" style="display:none; background:#e8f0fe; border-left:5px solid #1a73e8; padding:10px 14px; margin-bottom:14px; border-radius:6px; font-size:0.9rem;">
+    <span style="font-weight:bold; color:#1a73e8;" id="specialDayTitle"></span>
+    <div style="font-size:0.8rem; color:#555; margin-top:2px;" id="specialDayDesc"></div>
+  </div>
+
+  <!-- 予測条件設定 -->
+  <div class="config-card">
+    <h2>翌日予測条件の設定</h2>
+    <div class="form-group">
+      <label for="presetMode">機種判定モード</label>
+      <select id="presetMode">
+        <option value="auto">機種名から自動判別（推奨）</option>
+        <option value="juggler">ジャグラー基準（解析照合: REG70% / 合算30%）</option>
+        <option value="hanahana">ハナハナ基準（解析照合: REG60% / 合算40%）</option>
+        <option value="at_smart">スマスロ・AT機基準（初当り合算値照合・リセット/不発重視）</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="targetDigit">狙い末尾</label>
+        <select id="targetDigit">
+          <option value="auto">翌日付末尾（自動）</option>
+          <option value="none">末尾を考慮しない</option>
+          <option value="0">末尾 0</option>
+          <option value="1">末尾 1</option>
+          <option value="2">末尾 2</option>
+          <option value="3">末尾 3</option>
+          <option value="4">末尾 4</option>
+          <option value="5">末尾 5</option>
+          <option value="6">末尾 6</option>
+          <option value="7">末尾 7</option>
+          <option value="8">末尾 8</option>
+          <option value="9">末尾 9</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="minG">下限ゲーム数</label>
+        <input type="number" id="minG" value="1500" step="500">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="dropThresh">上げ: 凹み差枚基準 (枚)</label>
+        <input type="number" id="dropThresh" value="1500" step="500">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="enableDouble" checked>
+        台番ゾロ目台を加点する
+      </label>
+    </div>
+
+    <button class="exec-btn" id="runBtn" onclick="executePrediction()">最新データから翌日予測を実行</button>
+    <button class="exec-btn" id="verifyBtn" style="background-color:#455a64; margin-top:8px;" onclick="loadVerificationStats()">過去の的中率・実績を検証</button>
+    <div id="verifyResult" style="margin-top:10px; font-size:0.85rem; display:none; background:#fafafa; padding:12px; border-radius:6px; border:1px solid #ddd;"></div>
+  </div>
+
+  <!-- ガイド -->
+  <details class="logic-guide-box">
+    <summary class="logic-guide-summary">💡 機種スペック・初当り確率完全連動型の判定基準</summary>
+    <div class="logic-guide-content">
+      <strong>【解析値照合＆設定推測仕様】</strong>
+      <ul>
+        <li><strong>ノーマル機（ジャグラー・ハナハナ等）:</strong> 合算およびREG確率を解析テーブルと照合（設定1〜6）。</li>
+        <li><strong>スマスロ・AT機（北斗・カバネリ・AT系）:</strong> 単純な合算ではなく、連チャンを除いた<strong>「実質初当り合算確率」</strong>を自動抽出し、初当りスペックテーブル（1/218〜1/345）と照合。</li>
+        <li><strong>スマスロ不発高設定:</strong> 3,500G以上 ＋ 差枚マイナス ＋ 初当り設定⑤⑥近似で[+20%]（展開負けによる翌日据置・リベンジ狙い）[cite: 1]。</li>
+        <li><strong>差枚トレンド:</strong> 直近凹み[+15%]、2日連続凹み[+10%]、3日連続凹み[+20%]、直近+1,800枚[+12%]、連日大勝[-15%][cite: 1]。</li>
+        <li><strong>長期未投入サイクル:</strong> 過去に高設定挙動がない期間が継続している台に[+8%]（投入サイクル狙い）[cite: 1]。</li>
+        <li><strong>配置連動:</strong> 隣接台有力（並び狙い）[+10%]、特定日末尾[+15%×重み]、台番ゾロ目[+10〜25%]、角台[+5%][cite: 1]。</li>
+      </ul>
+    </div>
+  </details>
+
+  <!-- 表示切替タブ -->
+  <div class="tab-group">
+    <button class="tab-btn active" id="tabCards" onclick="switchView('cards')">カード一覧</button>
+    <button class="tab-btn" id="tabMap" onclick="switchView('map')">シマ並びマップ</button>
+  </div>
+
+  <!-- シマ並びヒートマップ表示エリア -->
+  <div id="mapViewContainer" style="display:none;">
+    <!-- シマ配置マスタの編集パネル（Web画面から直接編集可能） -->
+    <details class="logic-guide-box" style="margin-bottom:12px;">
+      <summary class="logic-guide-summary" style="color:#0f766e; background:#ccfbf1;">⚙️ シマ配置（島列・通路）をテキスト貼り付けで編集</summary>
+      <div class="logic-guide-content" style="background:#f0fdfa;">
+        <p style="margin:0 0 8px 0; font-size:0.8rem; color:#475569;">
+          スプレッドシートを開かずに、台番号を貼り付けるだけで「layout」シートを即時更新できます。<br>
+          台番号は<strong>改行</strong>または<strong>スペース・カンマ区切り</strong>で入力してください。
+        </p>
+        <button type="button" class="exec-btn" style="background-color:#0d9488; padding:6px; font-size:0.8rem; width:auto; margin-bottom:10px;" onclick="loadCurrentLayoutToForm()">現在の配置をフォームに読み込む</button>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="layoutColA" style="color:#0f766e;">島A（左列）の台番</label>
+            <textarea id="layoutColA" rows="8" placeholder="2563&#10;2565&#10;2566&#10;..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="layoutColB" style="color:#0f766e;">島B（右列）の台番</label>
+            <textarea id="layoutColB" rows="8" placeholder="2617&#10;2625&#10;2626&#10;..."></textarea>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="font-weight:600; color:#334155;">
+            <input type="checkbox" id="layoutAisle" checked>
+            中央に通路スペース（通路列）を自動で挟む
+          </label>
+        </div>
+        <button type="button" class="exec-btn" id="saveLayoutBtn" style="background-color:#0f766e;" onclick="submitLayoutUpdate()">シマ配置を保存してマップを再描画</button>
+        <div id="layoutStatus" style="font-size:0.8rem; margin-top:6px;"></div>
+      </div>
+    </details>
+
+    <div class="island-layout-wrap">
+      <div id="islandGrid" class="island-grid"></div>
+    </div>
+  </div>
+
+  <!-- 予測結果カード一覧エリア -->
+  <div id="cardsViewContainer">
+    <div id="resultsContainer">
+      <div class="status-msg">「最新データから翌日予測を実行」を押してください。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentResults = [];
+let currentLayoutMatrix = [];
+
+window.onload = function() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById("baseDate").value = `${yyyy}-${mm}-${dd}`;
+
+  const savedUrl = localStorage.getItem("slot_api_url");
+  const savedToken = localStorage.getItem("slot_api_token");
+  if (savedUrl) document.getElementById("apiUrl").value = savedUrl;
+  if (savedToken) document.getElementById("apiToken").value = savedToken;
+
+  executePrediction();
+};
+
+function saveApiConfig() {
+  const url = document.getElementById("apiUrl").value.trim();
+  const token = document.getElementById("apiToken").value.trim();
+  localStorage.setItem("slot_api_url", url);
+  localStorage.setItem("slot_api_token", token);
+  alert("接続設定を保存しました。");
+}
+
+async function callApi(action, payload = {}) {
+  const url = document.getElementById("apiUrl").value.trim();
+  const token = document.getElementById("apiToken").value.trim();
+
+  if (url) {
+    const requestBody = { action: action, token: token, ...payload };
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(requestBody),
+      redirect: "follow"
+    });
+    if (!response.ok) throw new Error(`HTTP通信エラー: ${response.status}`);
+    const resJson = await response.json();
+    if (!resJson.success) throw new Error(resJson.error || "API処理でエラーが発生しました。");
+    return resJson.data;
+  }
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    return new Promise((resolve, reject) => {
+      const runner = google.script.run
+        .withSuccessHandler(res => resolve(res))
+        .withFailureHandler(err => reject(err));
+
+      if (action === "uploadAndParse") {
+        runner.parseSlotImageWithGemini(payload.base64Data, payload.mimeType, payload.baseDate);
+      } else if (action === "predict") {
+        runner.runAnalysisWithConditions(payload.conditions || {});
+      } else if (action === "updateLayout") {
+        runner.saveIslandLayout(payload.layoutGrid || []);
+      } else if (action === "verify") {
+        runner.verifyPastPredictions();
+      } else {
+        reject(new Error("未対応のアクションです"));
+      }
+    });
+  }
+
+  throw new Error("API接続先が設定されていません。「API接続設定」にGASのWebアプリURLを入力してください。");
+}
+
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        resolve({
+          base64Data: dataUrl.split(",")[1],
+          mimeType: "image/jpeg"
+        });
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadAndParseImages() {
+  const fileInput = document.getElementById("slotImages");
+  const statusDiv = document.getElementById("uploadStatus");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const progressWrap = document.getElementById("progressWrap");
+  const progressBar = document.getElementById("progressBar");
+  const baseDate = document.getElementById("baseDate").value;
+
+  if (!baseDate) {
+    alert("基準日を選択してください。");
+    return;
+  }
+  const files = fileInput.files;
+  if (!files || files.length === 0) {
+    alert("画像ファイルを選択してください。");
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  progressWrap.style.display = "block";
+  progressBar.style.width = "0%";
+  const total = files.length;
+  let successCount = 0;
+  const processedMachines = [];
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    statusDiv.innerText = `[${i + 1}/${total}] 画像「${file.name}」を事前圧縮中...`;
+
+    try {
+      const compressed = await compressImageFile(file);
+      statusDiv.innerText = `[${i + 1}/${total}] Gemini APIで3日分データを抽出・保存中...`;
+
+      const res = await callApi("uploadAndParse", {
+        base64Data: compressed.base64Data,
+        mimeType: compressed.mimeType,
+        baseDate: baseDate
+      });
+
+      successCount++;
+      processedMachines.push(res.machineNo);
+      const pct = Math.round(((i + 1) / total) * 100);
+      progressBar.style.width = `${pct}%`;
+    } catch (err) {
+      statusDiv.innerHTML += `<br><span style="color:red;">【エラー】${file.name}: ${err.message}</span>`;
+    }
+  }
+
+  statusDiv.innerHTML = `<span style="color:#2e7d32; font-weight:bold;">完了: 全${total}枚中 ${successCount}台を登録しました。（台番: ${processedMachines.join(", ")}）</span>`;
+  fileInput.value = "";
+  uploadBtn.disabled = false;
+  executePrediction();
+}
+
+async function executePrediction() {
+  const runBtn = document.getElementById("runBtn");
+  const container = document.getElementById("resultsContainer");
+  runBtn.disabled = true;
+  container.innerHTML = '<div class="status-msg">機種別解析照合・設定推測を実行中...</div>';
+
+  const conditions = {
+    presetMode: document.getElementById("presetMode").value,
+    targetDigit: document.getElementById("targetDigit").value,
+    minG: document.getElementById("minG").value,
+    dropThresh: document.getElementById("dropThresh").value,
+    enableDouble: document.getElementById("enableDouble").checked
+  };
+
+  try {
+    const res = await callApi("predict", { conditions: conditions });
+    currentResults = res.list || [];
+    currentLayoutMatrix = res.layoutMatrix || [];
+
+    if (res.specialDay && res.specialDay.eventType !== "通常営業") {
+      document.getElementById("specialDayBanner").style.display = "block";
+      document.getElementById("specialDayTitle").innerText = `【特定日判定】${res.specialDay.eventType}`;
+      document.getElementById("specialDayDesc").innerText = `末尾・ゾロ目配点を x${res.specialDay.bonusWeight} に自動補正しました。`;
+    } else {
+      document.getElementById("specialDayBanner").style.display = "none";
+    }
+
+    renderCards(currentResults);
+    renderIslandLayout(currentResults, currentLayoutMatrix);
+  } catch (err) {
+    showError(err);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function switchView(view) {
+  const cardsTab = document.getElementById("tabCards");
+  const mapTab = document.getElementById("tabMap");
+  const cardsContainer = document.getElementById("cardsViewContainer");
+  const mapContainer = document.getElementById("mapViewContainer");
+
+  if (view === "cards") {
+    cardsTab.classList.add("active");
+    mapTab.classList.remove("active");
+    cardsContainer.style.display = "block";
+    mapContainer.style.display = "none";
+  } else {
+    mapTab.classList.add("active");
+    cardsTab.classList.remove("active");
+    cardsContainer.style.display = "none";
+    mapContainer.style.display = "block";
+  }
+}
+
+function loadCurrentLayoutToForm() {
+  if (!currentLayoutMatrix || currentLayoutMatrix.length <= 1) {
+    alert("現在読み込まれているレイアウトデータがありません。");
+    return;
+  }
+  const colA = [];
+  const colB = [];
+  for (let r = 1; r < currentLayoutMatrix.length; r++) {
+    const row = currentLayoutMatrix[r];
+    if (row[0]) colA.push(row[0]);
+    if (row.length >= 3 && row[2]) colB.push(row[2]);
+  }
+  document.getElementById("layoutColA").value = colA.join("\n");
+  document.getElementById("layoutColB").value = colB.join("\n");
+}
+
+function parseMachineNumbers(text) {
+  return String(text || "")
+    .split(/[\n,、\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+async function submitLayoutUpdate() {
+  const statusDiv = document.getElementById("layoutStatus");
+  const btn = document.getElementById("saveLayoutBtn");
+  const colAText = document.getElementById("layoutColA").value;
+  const colBText = document.getElementById("layoutColB").value;
+  const includeAisle = document.getElementById("layoutAisle").checked;
+
+  const listA = parseMachineNumbers(colAText);
+  const listB = parseMachineNumbers(colBText);
+
+  if (listA.length === 0 && listB.length === 0) {
+    alert("島Aまたは島Bの台番号を入力してください。");
+    return;
+  }
+
+  btn.disabled = true;
+  statusDiv.innerHTML = '<span style="color:#0f766e;">スプレッドシートの「layout」シートを更新中...</span>';
+
+  const maxLen = Math.max(listA.length, listB.length);
+  const grid = [];
+  if (includeAisle) {
+    grid.push(["島A(左列)", "通路", "島B(右列)"]);
+    for (let r = 0; r < maxLen; r++) {
+      grid.push([listA[r] || "", "", listB[r] || ""]);
+    }
+  } else {
+    grid.push(["島A(左列)", "島B(右列)"]);
+    for (let r = 0; r < maxLen; r++) {
+      grid.push([listA[r] || "", listB[r] || ""]);
+    }
+  }
+
+  try {
+    await callApi("updateLayout", { layoutGrid: grid });
+    statusDiv.innerHTML = '<span style="color:#2e7d32; font-weight:bold;">✓ シマ配置マスタを保存しました。マップを再描画します。</span>';
+    currentLayoutMatrix = grid;
+    renderIslandLayout(currentResults, currentLayoutMatrix);
+  } catch (err) {
+    statusDiv.innerHTML = `<span style="color:red;">更新エラー: ${err.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderIslandLayout(data, layoutMatrix) {
+  const grid = document.getElementById("islandGrid");
+  if (!data || data.length === 0) {
+    grid.innerHTML = '<div class="status-msg">データがありません</div>';
+    return;
+  }
+
+  const dataMap = new Map();
+  data.forEach(item => dataMap.set(String(item.machineNo).trim(), item));
+
+  if (layoutMatrix && layoutMatrix.length > 0) {
+    const numCols = Math.max(...layoutMatrix.map(row => row.length));
+    grid.style.gridTemplateColumns = `repeat(${numCols}, minmax(64px, 1fr))`;
+
+    let html = "";
+    layoutMatrix.forEach(row => {
+      row.forEach(cell => {
+        const val = String(cell || "").trim();
+        if (!val || val === "通路") {
+          html += `<div class="hm-aisle">通路</div>`;
+        } else if (dataMap.has(val)) {
+          const item = dataMap.get(val);
+          let lvClass = "hm-lv-low";
+          if (item.score >= 90) lvClass = "hm-lv-6";
+          else if (item.score >= 80) lvClass = "hm-lv-5";
+          else if (item.score >= 70) lvClass = "hm-lv-4";
+          else if (item.score >= 55) lvClass = "hm-lv-3";
+
+          html += `
+            <div class="heatmap-cell ${lvClass}" onclick="scrollToCard('${item.machineNo}')" title="${item.machineName}">
+              <div class="hm-no">${item.machineNo}</div>
+              <div class="hm-score">${item.score}%</div>
+            </div>
+          `;
+        } else {
+          html += `<div class="hm-label">${val}</div>`;
+        }
+      });
+    });
+    grid.innerHTML = html;
+  } else {
+    const sorted = [...data].sort((a, b) => Number(a.machineNo) - Number(b.machineNo));
+    grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(70px, 1fr))`;
+    let html = "";
+    sorted.forEach(item => {
+      let lvClass = "hm-lv-low";
+      if (item.score >= 90) lvClass = "hm-lv-6";
+      else if (item.score >= 80) lvClass = "hm-lv-5";
+      else if (item.score >= 70) lvClass = "hm-lv-4";
+      else if (item.score >= 55) lvClass = "hm-lv-3";
+
+      html += `
+        <div class="heatmap-cell ${lvClass}" onclick="scrollToCard('${item.machineNo}')" title="${item.machineName}">
+          <div class="hm-no">${item.machineNo}</div>
+          <div class="hm-score">${item.score}%</div>
+        </div>
+      `;
+    });
+    grid.innerHTML = html;
+  }
+}
+
+function scrollToCard(machineNo) {
+  switchView('cards');
+  const target = document.getElementById(`card-${machineNo}`);
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.style.boxShadow = "0 0 10px #1a73e8";
+    setTimeout(() => { target.style.boxShadow = ""; }, 1800);
+  }
+}
+
+function renderCards(data) {
+  const container = document.getElementById("resultsContainer");
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="status-msg">条件に合致するデータがありません。ゲーム数下限などを調整してください。</div>';
+    return;
+  }
+
+  let html = "";
+  data.forEach(item => {
+    let cardClass = "";
+    if (item.type.includes("不発")) cardClass = "fuhatsu";
+    else if (item.type.includes("据え置き")) cardClass = "sueoki";
+    else if (item.type.includes("上げ")) cardClass = "age";
+    else cardClass = "tokubetsu";
+
+    let scoreClass = item.score >= 80 ? "high" : (item.score >= 65 ? "mid" : "low");
+    const diffFormat = item.diffCoins > 0 ? `+${item.diffCoins}` : `${item.diffCoins}`;
+    const diff3Days = item.total3DaysDiff > 0 ? `+${item.total3DaysDiff}` : `${item.total3DaysDiff}`;
+
+    const reasons = item.reasons || (item.reasonStr ? item.reasonStr.split(" / ") : []);
+    const badgesHtml = reasons.map(r => {
+      const isHigh = r.includes("設定⑥") || r.includes("設定⑤") || r.includes("不発") || r.includes("ゾロ目") || r.includes("並び") || r.includes("サイクル") || r.includes("3日連続") || r.includes("初当り");
+      return `<span class="reason-badge ${isHigh ? 'highlight' : ''}">${r}</span>`;
+    }).join("");
+
+    const dateLabel = item.dataDate || "直近";
+    const isSmart = (item.profileKey === "at_smart");
+    const probTitle = isSmart ? "実質初当り確率" : "合算 / REG";
+
+    html += `
+      <div class="card ${cardClass}" id="card-${item.machineNo}">
+        <div class="card-top">
+          <div class="machine-no-area">
+            <span class="machine-no">台番: ${item.machineNo}</span>
+            <span class="date-badge">データ日: ${dateLabel}</span>
+            ${isSmart ? '<span class="type-badge">スマスロ・AT</span>' : ''}
+          </div>
+          <div class="score-badge ${scoreClass}">設定⑥期待度: ${item.score}%</div>
+        </div>
+        
+        <div class="machine-name">${item.machineName}</div>
+
+        <div class="setting-predict-row">
+          <span class="pill-badge pill-past">直近実績: ${item.estimatedPastSetting}</span>
+          <span class="pill-badge pill-target">翌日予想: ${item.targetSetting}</span>
+        </div>
+
+        <div class="data-grid">
+          <div><span>${dateLabel} G数</span><strong>${item.totalG} G</strong></div>
+          <div><span>${probTitle}</span><strong>${item.displayProb}</strong></div>
+          <div><span>${dateLabel} / 3日差枚</span><strong>${diffFormat} / ${diff3Days}</strong></div>
+        </div>
+
+        <div class="reason-box">
+          <div class="reason-title">🎯 判定根拠・加点ポイント</div>
+          <div class="reason-badges">
+            ${badgesHtml || '<span class="reason-badge">特記事項なし</span>'}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+async function loadVerificationStats() {
+  const btn = document.getElementById("verifyBtn");
+  const resultDiv = document.getElementById("verifyResult");
+  btn.disabled = true;
+  btn.innerText = "照合集計中...";
+
+  try {
+    const res = await callApi("verify");
+    resultDiv.style.display = "block";
+
+    if (res.totalHighRank === 0) {
+      resultDiv.innerHTML = "検証対象となる予測データ（75%以上）がまだ十分に蓄積されていません。";
+      return;
+    }
+
+    let breakdown = Object.entries(res.typeStats).map(([type, stat]) => {
+      const r = stat.count > 0 ? Math.round((stat.hit / stat.count) * 100) : 0;
+      return `<li>${type}: ${stat.hit}/${stat.count}台 (${r}%)</li>`;
+    }).join("");
+
+    resultDiv.innerHTML = `
+      <strong>【高確信台(75%以上)の答え合わせ】</strong><br>
+      累計的中率: <strong style="color:#d32f2f; font-size:1.1rem;">${res.hitRate}%</strong> (${res.hitCount} / ${res.totalHighRank}台)<br>
+      <ul style="margin:6px 0 0 16px; padding:0; font-size:0.8rem; color:#444;">
+        ${breakdown}
+      </ul>
+    `;
+  } catch (err) {
+    alert("検証エラー: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "過去の的中率・実績を検証";
+  }
+}
+
+function showError(err) {
+  document.getElementById("runBtn").disabled = false;
+  document.getElementById("resultsContainer").innerHTML =
+    `<div class="status-msg" style="color:red;">エラーが発生しました: ${err.message}</div>`;
+}
+</script>
+</body>
+</html>
